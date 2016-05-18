@@ -407,6 +407,7 @@ class TaskPollingMonitor implements TaskMonitor {
             fault = handler.task.processor.resumeOrDie(handler?.task, error)
         }
         finally {
+            session.notifyError(handler, error)
             // abort the session if a task task was returned
             if (fault instanceof TaskFault) {
                 session.abort(fault)

@@ -489,7 +489,7 @@ abstract class TaskProcessor {
      *
      */
 
-    final protected boolean checkCachedOrLaunchTask( TaskRun task, HashCode hash, boolean shouldTryCache, RunType runType ) {
+    final protected boolean checkCachedOrLaunchTask( TaskRun task, HashCode hash, boolean shouldTryCache ) {
 
         int tries = 0
         while( true ) {
@@ -518,7 +518,7 @@ abstract class TaskProcessor {
                 continue
 
             // submit task for execution
-            submitTask( task, runType, hash, folder )
+            submitTask( task, hash, folder )
             return true
         }
 
@@ -682,7 +682,7 @@ abstract class TaskProcessor {
             return true
         }
 
-        return strategy == ErrorStrategy.TERMINATE
+        return strategy == ErrorStrategy.TERMINATE || strategy == ErrorStrategy.CANCEL
     }
 
     /**
@@ -702,6 +702,7 @@ abstract class TaskProcessor {
             // do not recoverable error, just trow it again
             if( error instanceof Error ) throw error
 
+            final taskStrategy = task.config.getErrorStrategy()
             final int taskErrCount = task ? ++task.failCount : 0
             final int procErrCount = ++errorCount
 
@@ -757,6 +758,7 @@ abstract class TaskProcessor {
     protected ErrorStrategy checkErrorStrategy( TaskRun task, ProcessException error, int taskErrCount, int procErrCount ) {
         // increment the attempt number before evaluate
         // the `errorStrategy` property
+        task.runType = RunType.RETRY
         task.config.attempt = taskErrCount+1
         final taskStrategy = task.config.getErrorStrategy()
 
@@ -779,7 +781,7 @@ abstract class TaskProcessor {
             if( (procErrCount < maxErrors || maxErrors == -1) && taskErrCount <= maxRetries ) {
                 session.getExecService().submit({
                     try {
-                        checkCachedOrLaunchTask( task, task.hash, false, RunType.RETRY )
+                        cytoscape.js.dag.template.htmlcheckCachedOrLaunchTask( task, task.hash, false )
                     }
                     catch( Throwable e ) {
                         log.error "Unable to re-submit task `${task.name}`"
@@ -1615,14 +1617,14 @@ abstract class TaskProcessor {
      * @param script The script string to be execute, e.g. a BASH script
      * @return {@code TaskDef}
      */
-    final protected void submitTask( TaskRun task, RunType runType, HashCode hash, Path folder ) {
+    final protected void submitTask( TaskRun task, HashCode hash, Path folder ) {
         if( log.isTraceEnabled() )
             log.trace "[${task.name}] actual run folder: ${task.workDir}"
 
         makeTaskContextStage3(task, hash, folder)
 
         // add the task to the collection of running tasks
-        session.dispatcher.submit(task, blocking, runType.message)
+        session.dispatcher.submit(task, blocking)
 
     }
 

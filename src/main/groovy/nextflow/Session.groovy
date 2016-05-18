@@ -463,6 +463,11 @@ class Session implements ISession {
 
     }
 
+    void cancel( ) {
+
+    }
+
+
     void abort(TaskFault fault) {
         if( aborted ) return
         this.fault = fault
@@ -529,6 +534,7 @@ class Session implements ISession {
      * Notifies that a task has been submitted
      */
     void notifyTaskSubmit( TaskHandler handler ) {
+        log.info "[${handler.task.hashLog}] $submitMessage > ${handler.task.name}"
         for( TraceObserver it : observers ) {
             try {
                 it.onProcessSubmit(handler)
@@ -569,6 +575,25 @@ class Session implements ISession {
             }
         }
     }
+
+
+    /**
+     * Notify a task failure
+     *
+     * @param handler
+     * @param e
+     */
+    public void notifyError( TaskHandler handler, Throwable error ) {
+//        for( TraceObserver it : observers ) {
+//            try {
+//                it.onProcessError(handler,error)
+//            }
+//            catch( Exception e ) {
+//                log.error(e.getMessage(), e)
+//            }
+//        }
+    }
+
 
     @Memoized
     public getExecConfigProp( String execName, String name, Object defValue, Map env = null  ) {
