@@ -122,6 +122,8 @@ class Session implements ISession {
 
     private Barrier monitorsBarrier = new Barrier()
 
+    private volatile boolean cancelled
+
     private volatile boolean aborted
 
     private volatile boolean terminated
@@ -463,8 +465,11 @@ class Session implements ISession {
 
     }
 
-    void cancel( ) {
-
+    void cancel(Throwable cause = null) {
+        log.debug "Session cancelled -- Cause: ${cause}"
+        cancelled = true
+        dispatcher.signal()
+        allProcessors *. terminate()
     }
 
 
@@ -497,6 +502,8 @@ class Session implements ISession {
     boolean isTerminated() { terminated }
 
     boolean isAborted() { aborted }
+
+    boolean isCancelled() { cancelled }
 
     void processRegister(TaskProcessor process) {
         log.debug ">>> barrier register (process: ${process.name})"
@@ -534,7 +541,8 @@ class Session implements ISession {
      * Notifies that a task has been submitted
      */
     void notifyTaskSubmit( TaskHandler handler ) {
-        log.info "[${handler.task.hashLog}] $submitMessage > ${handler.task.name}"
+        final task = handler.task
+        log.info "[${task.hashLog}] ${task.runType.message} > ${task.name}"
         for( TraceObserver it : observers ) {
             try {
                 it.onProcessSubmit(handler)

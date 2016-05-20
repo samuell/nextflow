@@ -254,7 +254,7 @@ class TaskPollingMonitor implements TaskMonitor {
             while ( !canSubmit(handler) )
                 notFull.await();
 
-            if( !session.isTerminated()) {
+            if( !session.isTerminated() && !session.isCancelled() ) {
                 submit(handler)
                 return true
             }

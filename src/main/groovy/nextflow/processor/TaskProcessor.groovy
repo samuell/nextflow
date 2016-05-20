@@ -699,15 +699,15 @@ abstract class TaskProcessor {
 
         final message = []
         try {
-            // do not recoverable error, just trow it again
+            // -- do not recoverable error, just trow it again
             if( error instanceof Error ) throw error
 
-            final taskStrategy = task.config.getErrorStrategy()
+            final errorStrategy = task.config.getErrorStrategy()
             final int taskErrCount = task ? ++task.failCount : 0
             final int procErrCount = ++errorCount
 
-            // when is a task level error and the user has chosen to ignore error,
-            // just report and error message and DO NOT stop the execution
+            // -- when is a task level error and the user has chosen to ignore error,
+            //    just report and error message and DO NOT stop the execution
             if( task && error instanceof ProcessException ) {
                 // expose current task exist status
                 task.config.exitStatus = task.exitStatus
@@ -715,7 +715,8 @@ abstract class TaskProcessor {
                 task.config.retryCount = taskErrCount
 
                 // invoke `checkErrorStrategy` passing a copy of the task because the `attempt` attribute need to be modified
-                final strategy = checkErrorStrategy(task.clone(), error, taskErrCount, procErrCount)
+                final copy = task.clone()
+                final strategy = checkErrorStrategy(copy, error, taskErrCount, procErrCount)
                 if( strategy ) {
                     task.failed = true
                     return strategy
@@ -723,13 +724,13 @@ abstract class TaskProcessor {
 
             }
 
-            // mark the task as failed
+            // -- mark the task as failed
             if( task )
                 task.failed = true
 
-            // MAKE sure the error is showed only the very first time across all processes
+            // -- make sure the error is showed only the very first time across all processes
             if( errorShown.getAndSet(true) ) {
-                return ErrorStrategy.TERMINATE
+                return errorStrategy
             }
 
             message << "Error executing process > '${task?.name ?: name}'"
@@ -746,6 +747,12 @@ abstract class TaskProcessor {
                     message << formatErrorCause(error)
             }
             log.error message.join('\n'), error
+
+            // -- cancel the execution i.e. exit orderly completing the current running tasks
+            if( errorStrategy == ErrorStrategy.CANCEL ) {
+                session.cancel(error)
+                return errorStrategy
+            }
         }
         catch( Throwable e ) {
             // no recoverable error
@@ -781,7 +788,7 @@ abstract class TaskProcessor {
             if( (procErrCount < maxErrors || maxErrors == -1) && taskErrCount <= maxRetries ) {
                 session.getExecService().submit({
                     try {
-                        cytoscape.js.dag.template.htmlcheckCachedOrLaunchTask( task, task.hash, false )
+                        checkCachedOrLaunchTask( task, task.hash, false )
                     }
                     catch( Throwable e ) {
                         log.error "Unable to re-submit task `${task.name}`"
