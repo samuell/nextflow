@@ -682,7 +682,7 @@ abstract class TaskProcessor {
             return true
         }
 
-        return strategy == ErrorStrategy.TERMINATE || strategy == ErrorStrategy.CANCEL
+        return strategy == ErrorStrategy.TERMINATE || strategy == ErrorStrategy.FINISH
     }
 
     /**
@@ -749,7 +749,7 @@ abstract class TaskProcessor {
             log.error message.join('\n'), error
 
             // -- cancel the execution i.e. exit orderly completing the current running tasks
-            if( errorStrategy == ErrorStrategy.CANCEL ) {
+            if( errorStrategy == ErrorStrategy.FINISH ) {
                 session.cancel(error)
                 return errorStrategy
             }
