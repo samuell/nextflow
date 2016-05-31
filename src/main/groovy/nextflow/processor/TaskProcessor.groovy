@@ -674,15 +674,15 @@ abstract class TaskProcessor {
      */
     final protected boolean handleException( Throwable error, TaskRun task = null ) {
         log.trace "Handling error: $error -- task: $task"
-        def strategy = resumeOrDie(task, error)
+        def fault = resumeOrDie(task, error)
 
-        if (strategy instanceof TaskFault) {
-            session.abort(strategy)
+        if (fault instanceof TaskFault) {
+            session.fault(fault)
             // when a `TaskFault` is returned a `TERMINATE` is implicit, thus return `true`
             return true
         }
 
-        return strategy == ErrorStrategy.TERMINATE || strategy == ErrorStrategy.FINISH
+        return fault == ErrorStrategy.TERMINATE || fault == ErrorStrategy.FINISH
     }
 
     /**
@@ -697,12 +697,13 @@ abstract class TaskProcessor {
         if( log.isTraceEnabled() )
         log.trace "Handling unexpected condition for\n  task: $task\n  error [${error?.class?.name}]: ${error?.getMessage()?:error}"
 
+        ErrorStrategy errorStrategy = null
         final message = []
         try {
-            // -- do not recoverable error, just trow it again
+            // -- do not recoverable error, just re-throw it
             if( error instanceof Error ) throw error
 
-            final errorStrategy = task.config.getErrorStrategy()
+            errorStrategy = task.config.getErrorStrategy()
             final int taskErrCount = task ? ++task.failCount : 0
             final int procErrCount = ++errorCount
 
@@ -748,18 +749,13 @@ abstract class TaskProcessor {
             }
             log.error message.join('\n'), error
 
-            // -- cancel the execution i.e. exit orderly completing the current running tasks
-            if( errorStrategy == ErrorStrategy.FINISH ) {
-                session.cancel(error)
-                return errorStrategy
-            }
         }
         catch( Throwable e ) {
             // no recoverable error
             log.error("Execution aborted due to an unexpected error", e )
         }
 
-        return new TaskFault(error: error, task: task, report: message.join('\n'))
+        return new TaskFault(error: error, task: task, report: message.join('\n'), strategy: errorStrategy)
     }
 
     protected ErrorStrategy checkErrorStrategy( TaskRun task, ProcessException error, int taskErrCount, int procErrCount ) {

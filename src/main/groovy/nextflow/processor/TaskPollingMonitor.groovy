@@ -409,7 +409,7 @@ class TaskPollingMonitor implements TaskMonitor {
         finally {
             // abort the session if a task task was returned
             if (fault instanceof TaskFault) {
-                session.abort(fault)
+                session.fault(fault)
             }
         }
     }
@@ -441,9 +441,10 @@ class TaskPollingMonitor implements TaskMonitor {
 
             // notify task completion
             session.notifyTaskComplete(handler)
+
             // abort the execution in case of task failure
             if (fault instanceof TaskFault) {
-                session.abort((TaskFault)fault)
+                session.fault(fault)
             }
         }
 

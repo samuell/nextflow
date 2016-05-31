@@ -37,6 +37,7 @@ import groovy.util.logging.Slf4j
 import groovyx.gpars.GParsConfig
 import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.dag.DAG
+import nextflow.processor.ErrorStrategy
 import nextflow.trace.GraphObserver
 import nextflow.exception.MissingLibraryException
 import nextflow.processor.TaskDispatcher
@@ -141,6 +142,8 @@ class Session implements ISession {
     private int poolSize
 
     private Queue<TraceObserver> observers
+
+    private Closure errorAction
 
     private boolean statsEnabled
 
@@ -465,24 +468,31 @@ class Session implements ISession {
 
     }
 
-    void cancel(Throwable cause = null) {
-        log.debug "Session cancelled -- Cause: ${cause}"
-        cancelled = true
-        dispatcher.signal()
-        allProcessors *. terminate()
+    void fault(TaskFault fault) {
+        if( this.fault ) { return }
+        this.fault = fault
+
+        if( fault.strategy == ErrorStrategy.FINISH ) {
+            cancel(fault.error)
+        }
+        else {
+            abort(fault.error)
+        }
     }
 
-
-    void abort(TaskFault fault) {
-        if( aborted ) return
-        this.fault = fault
-        abort(fault.error)
+    void cancel(Throwable cause = null) {
+        log.info "Initiated orderly shutdown -- Finishing pending tasks before exit"
+        cancelled = true
+        notifyError(null)
+        dispatcher.signal()
+        allProcessors *. terminate()
     }
 
     void abort(Throwable cause = null) {
         if( aborted ) return
         log.debug "Session aborted -- Cause: ${cause}"
         aborted = true
+        notifyError(null)
         dispatcher.signal()
         processesBarrier.forceTermination()
         monitorsBarrier.forceTermination()
@@ -591,15 +601,17 @@ class Session implements ISession {
      * @param handler
      * @param e
      */
-    public void notifyError( TaskHandler handler, Throwable error ) {
-//        for( TraceObserver it : observers ) {
-//            try {
-//                it.onProcessError(handler,error)
-//            }
-//            catch( Exception e ) {
-//                log.error(e.getMessage(), e)
-//            }
-//        }
+    void notifyError( TaskHandler handler ) {
+        try {
+            errorAction.call()
+        }
+        catch( Throwable e ) {
+            log.error(e.getMessage(), e)
+        }
+    }
+
+    void onError( Closure action ) {
+        errorAction = action
     }
 
 
