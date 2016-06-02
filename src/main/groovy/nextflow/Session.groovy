@@ -468,26 +468,41 @@ class Session implements ISession {
 
     }
 
-    void fault(TaskFault fault) {
+    /**
+     * Halt the pipeline execution choosing exiting immediately or completing current
+     * pending task depending the chosen {@link ErrorStrategy}
+     *
+     * @param fault A {@link TaskFault} instance representing the error that caused the pipeline to stop
+     */
+    void fault(TaskFault fault, TaskHandler handler=null) {
         if( this.fault ) { return }
         this.fault = fault
 
         if( fault.strategy == ErrorStrategy.FINISH ) {
-            cancel(fault.error)
+            cancel(handler)
         }
         else {
             abort(fault.error)
         }
     }
 
-    void cancel(Throwable cause = null) {
-        log.info "Initiated orderly shutdown -- Finishing pending tasks before exit"
+    /**
+     * Cancel the pipeline execution waiting for the current running tasks to complete
+     */
+    @PackageScope
+    void cancel(TaskHandler handler) {
+        log.info "Execution cancelled -- Finishing pending tasks before exit"
         cancelled = true
-        notifyError(null)
+        notifyError(handler)
         dispatcher.signal()
         allProcessors *. terminate()
     }
 
+    /**
+     * Terminate the pipeline execution killing all running tasks
+     *
+     * @param cause A {@link Throwable} instance representing the execution that caused the pipeline execution to abort
+     */
     void abort(Throwable cause = null) {
         if( aborted ) return
         log.debug "Session aborted -- Cause: ${cause}"
@@ -499,6 +514,7 @@ class Session implements ISession {
         allProcessors *. terminate()
     }
 
+    @PackageScope
     void forceTermination() {
         terminated = true
         processesBarrier.forceTermination()
@@ -603,13 +619,17 @@ class Session implements ISession {
      */
     void notifyError( TaskHandler handler ) {
         try {
-            errorAction.call()
+            errorAction.call( handler?.getTraceRecord() )
         }
         catch( Throwable e ) {
             log.error(e.getMessage(), e)
         }
     }
 
+    /**
+     * Define the error event handler
+     * @param action
+     */
     void onError( Closure action ) {
         errorAction = action
     }

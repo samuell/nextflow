@@ -58,7 +58,7 @@ Completion handler
 -------------------
 
 Due to the asynchronous nature of Nextflow the termination of a script does not correspond to the termination
-of the running workflow. Thus the information, only available on execution completion, needs to be accessed by
+of the running workflow. Thus some information, only available on execution completion, needs to be accessed by
 using an asynchronous handler.
 
 The ``onComplete`` event handler is invoked by the framework when the workflow execution is completed. It allows one
@@ -70,6 +70,12 @@ to access the workflow termination status and other useful information. For exam
     }
 
 
+Error handler
+-------------
+
+The `onError`` even handler is invoked by Nextflow when a runtime or process error caused the pipeline execution to stop.
+
+It's worth noting the the
 
 Notification message
 ----------------------
@@ -113,6 +119,13 @@ has to be defined by using the assignment operator as shown below::
         println "Command line: $workflow.commandLine"
     }
 
+
+    workflow.onError = {
+        println "Oops .. something when wrong"
+        if( it ) {
+        println
+        }
+    }
 
 
 .. note:: It is possible to define a workflow completion handler both in the pipeline script **and** in the
